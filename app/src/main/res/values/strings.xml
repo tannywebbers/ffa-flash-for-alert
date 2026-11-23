@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">FFA</string>
+    <string name="app_full_name">Flash For Alert</string>
+    <string name="tile_label">FFA</string>
+</resources>

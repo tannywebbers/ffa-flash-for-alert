@@ -1,0 +1,55 @@
+FFA — FLASH FOR ALERT
+BUILD REPORT
+
+## Summary
+- Implemented a native Android Kotlin + Jetpack Compose app named FFA (Flash For Alert), package `com.ffa.flashforalert`.
+- Implemented: Quick Settings tile, NotificationListenerService detection/filter/dedup, Camera2 torch controller, serialized flash engine, DataStore settings, installed-app list with per-app toggles and Turn On All, onboarding/main/settings UI, adaptive launcher/tile branding assets, debug APK build.
+
+## Important Files Created/Modified
+- Root: `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `local.properties`, `gradlew`, `gradlew.bat`, `gradle/wrapper/*`, `.gitignore`, `FFA_BUILD_REPORT.txt`
+- App config: `app/build.gradle.kts`, `app/proguard-rules.pro`, `app/src/main/AndroidManifest.xml`
+- Core: `core/constants/FlashDefaults.kt`, `core/permissions/PermissionUtils.kt`
+- Data/domain: `data/preferences/FfaPreferencesRepository.kt`, `domain/models/*.kt`
+- App/services: `FfaApplication.kt`, `service/FfaServices.kt`
+- Flash: `flash/TorchController.kt`, `flash/FlashEngine.kt`
+- Notifications/calls: `notification/FfaNotificationListenerService.kt`, `notification/NotificationDeduplicator.kt`, `notification/NotificationEvent.kt`, `calls/CallDetectionManager.kt`
+- Quick Settings: `quicksettings/FfaQuickSettingsTileService.kt`
+- Apps: `apps/InstalledAppsRepository.kt`
+- UI: `MainActivity.kt`, `ui/FfaViewModel.kt`, `ui/navigation/*`, `ui/screens/*`, `ui/theme/Theme.kt`
+- Resources/icons: `res/values/*`, `res/drawable/*`, `res/mipmap-anydpi-v26/*`
+
+## Android SDK / Build
+- compileSdk: 35 (targeted 36 initially; set to 35 because SDK Platform 36 install failed in this environment and SDK 35 is installed)
+- minSdk: 26
+- targetSdk: 35
+- AGP: 8.7.3, Kotlin: 2.0.21, Gradle wrapper: 8.13
+- JDK: Eclipse Temurin 17
+
+## Permissions / Why Needed
+- `BIND_NOTIFICATION_LISTENER_SERVICE` (service binding): required for notification callbacks.
+- `BIND_QUICK_SETTINGS_TILE` (service binding): required for Quick Settings tile.
+- `android.permission.VIBRATE`: optional hard-coded 40ms vibration on flash trigger.
+- `android.permission.QUERY_ALL_PACKAGES` (declared, tools:ignore): used for complete launcher-visible installed-app list for per-app selection as requested; no app data collected/transmitted.
+- No CAMERA runtime permission requested; torch uses Camera2 `CameraManager.setTorchMode` / `turnOnTorchWithStrengthLevel`.
+
+## Supported / Unsupported Hardware Capabilities
+- Supported when available: rear/available camera flash torch ON/OFF via Camera2; torch strength control on Android 13+ devices exposing `FLASH_INFO_STRENGTH_MAXIMUM_LEVEL > 1`.
+- Unsupported/limited: no flash unit (UI reports unavailable); no torch strength support (Dim unavailable, standard torch used); camera-in-use conflicts can block torch; OEM background restrictions may affect delivery.
+
+## Implementation Notes / Known Limitations
+- Notification detection: `NotificationListenerService.onNotificationPosted`; no polling, no AccessibilityService.
+- Default pattern: initial OFF 120ms, ON 80ms, OFF 120ms, ON 80ms, final OFF (2 pulses). Initial OFF and 2-pulse count are hard-coded. ON/OFF durations configurable via presets/manual inputs.
+- Flash while locked/unlocked/silent: hard-coded always enabled; engine does not gate on lock/sound state.
+- Vibration: hard-coded 40ms, toggle only in Settings.
+- Call detection: via `Notification.CATEGORY_CALL` in NotificationListenerService (permission-conscious; no READ_PHONE_STATE/READ_CALL_LOG). Behavior depends on dialer/OS posting call-category notifications.
+- Dedup: StatusBarNotification key/postTime heuristic; grouped notification updates can vary by app/OS.
+- No backend/auth/ads/analytics/accessibility/overlay/storage/location/contacts/mic permissions.
+
+## Build Result
+- Debug build: SUCCESS (`:app:assembleDebug`)
+- APK: `app/build/outputs/apk/debug/app-debug.apk`
+
+## Verification Caveats
+- Physical device verification was not performed in this environment (no real flash/notification/call hardware test).
+- Quick Settings tile flow, notification access grant/revoke, real app notifications, call-category behavior, and torch strength behavior require on-device validation.
+- Release signing not configured with production keystore; debug build only.
