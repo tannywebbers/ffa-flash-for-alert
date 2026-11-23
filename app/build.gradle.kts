@@ -85,3 +85,14 @@ dependencies {
   debugImplementation("androidx.compose.ui:ui-tooling")
   debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+tasks.register<Copy>("exportReleases") {
+  dependsOn("assembleDebug", "assembleRelease")
+  from(layout.buildDirectory.dir("outputs/apk/debug")) {
+    include("*.apk")
+  }
+  from(layout.buildDirectory.dir("outputs/apk/release")) {
+    include("*.apk")
+  }
+  into(rootProject.layout.projectDirectory.dir("releases"))
+}
