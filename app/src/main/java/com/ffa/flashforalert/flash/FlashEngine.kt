@@ -70,13 +70,22 @@ class FlashEngine(
             if (pattern.initialOffMs > 0) {
                 preciseDelay(pattern.initialOffMs)
             }
-            repeat(pattern.pulses.coerceIn(FlashDefaults.MIN_PULSES, FlashDefaults.MAX_PULSES)) { index ->
-                if (!kotlin.coroutines.coroutineContext.isActive) return
-                torchController.setTorch(true, brightnessMode)
-                preciseDelay(pattern.onMs)
-                torchController.forceOff()
-                if (index < pattern.pulses - 1) {
+            if (pattern.repeatUntilCancelled) {
+                while (kotlin.coroutines.coroutineContext.isActive) {
+                    torchController.setTorch(true, brightnessMode)
+                    preciseDelay(pattern.onMs)
+                    torchController.forceOff()
                     preciseDelay(pattern.offMs)
+                }
+            } else {
+                repeat(pattern.pulses.coerceIn(FlashDefaults.MIN_PULSES, FlashDefaults.MAX_PULSES)) { index ->
+                    if (!kotlin.coroutines.coroutineContext.isActive) return
+                    torchController.setTorch(true, brightnessMode)
+                    preciseDelay(pattern.onMs)
+                    torchController.forceOff()
+                    if (index < pattern.pulses - 1) {
+                        preciseDelay(pattern.offMs)
+                    }
                 }
             }
         } catch (e: Exception) {

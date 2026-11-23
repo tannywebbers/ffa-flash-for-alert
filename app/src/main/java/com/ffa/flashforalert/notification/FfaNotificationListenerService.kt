@@ -1,6 +1,7 @@
 package com.ffa.flashforalert.notification
 
 import android.app.Notification
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -58,18 +59,12 @@ class FfaNotificationListenerService : NotificationListenerService() {
             val pkg = sbn.packageName ?: return
             if (pkg == packageName) return
 
-            if (!deduplicator.isNewEvent(sbn)) return
-
-            val isCall = isIncomingCallNotification(sbn)
-            if (isCall) {
-                triggerCallFlash()
-                return
+            val n = sbn.notification ?: return
+            if (isCallNotification(n)) {
+                handleCallNotification(sbn, n)
             }
-
-            if (!isAlertableNotification(sbn)) return
-            if (!settings.selectedPackages.contains(pkg)) return
-
-            triggerNotificationFlash()
+            // App is call-only by product requirement: ignore non-call notifications.
+            return
         } catch (e: Exception) {
             Log.w(TAG, "onNotificationPosted error", e)
         }
@@ -79,59 +74,45 @@ class FfaNotificationListenerService : NotificationListenerService() {
         sbn ?: return
         try {
             deduplicator.remove(sbn)
+            val n = sbn.notification
+            if (n != null && isCallNotification(n)) {
+                FfaServices.flashEngine.cancel()
+            }
         } catch (_: Exception) { }
     }
 
-    private fun isIncomingCallNotification(sbn: StatusBarNotification): Boolean {
-        val n = sbn.notification ?: return false
-        val category = n.category
-        if (category == Notification.CATEGORY_CALL) return true
-        // Some dialers post call-style notifications without category; be conservative.
-        return false
+    private fun isCallNotification(n: Notification): Boolean {
+        return n.category == Notification.CATEGORY_CALL
     }
 
-    private fun isAlertableNotification(sbn: StatusBarNotification): Boolean {
-        val n = sbn.notification ?: return false
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
-            // Group summaries can be noisy; allow only if they look like fresh alert events? 
-            // Safer to ignore summaries to avoid duplicate flashes for grouped updates.
-            // But some apps may only post summaries - keep conservative: ignore summaries.
-            // return false
+    private fun handleCallNotification(sbn: StatusBarNotification, n: Notification) {
+        val isRinging = isIncomingRingingCall(n)
+        if (isRinging) {
+            if (!deduplicator.isNewEvent(sbn)) return
+            triggerCallFlash()
+        } else {
+            FfaServices.flashEngine.cancel()
         }
-        // Avoid ongoing/non-alert service notifications where possible
-        if (sbn.isOngoing && n.category != Notification.CATEGORY_MESSAGE && n.category != Notification.CATEGORY_EMAIL) {
-            return false
-        }
-        return true
     }
 
-    private fun triggerNotificationFlash() {
-        val settings = FfaServices.currentSettings()
-        if (!FfaServices.torchController.hasFlashUnit()) return
-        val pattern = FlashPattern(
-            initialOffMs = FlashDefaults.NOTIFICATION_INITIAL_OFF_MS,
-            onMs = settings.notificationOnMs,
-            offMs = settings.notificationOffMs,
-            pulses = FlashDefaults.NOTIFICATION_PULSES
-        )
-        FfaServices.flashEngine.play(
-            pattern = pattern,
-            brightnessMode = settings.brightnessMode,
-            vibrate = settings.vibrationEnabled
-        )
+    private fun isIncomingRingingCall(n: Notification): Boolean {
+        if (n.category != Notification.CATEGORY_CALL) return false
+        val isOngoing = (n.flags and Notification.FLAG_ONGOING_EVENT) != 0
+        val isGroupSummary = (n.flags and Notification.FLAG_GROUP_SUMMARY) != 0
+        if (isGroupSummary || !isOngoing) return false
+        // Incoming ringing call notifications commonly expose a full-screen intent.
+        return n.fullScreenIntent != null
     }
 
     private fun triggerCallFlash() {
         val settings = FfaServices.currentSettings()
         if (!FfaServices.torchController.hasFlashUnit()) return
-        // Calls: continuous-ish alert pattern? spec defines call flash intervals (ON/OFF) but not pulse count explicitly
-        // "CALL FLASH INTERVALS ... Provide ON/OFF duration..." and "separate call flash configuration".
-        // Use a repeating-feel sequence with multiple pulses while keeping bounded; choose reasonable pulse count.
         val pattern = FlashPattern(
             initialOffMs = 0L,
             onMs = settings.callOnMs,
             offMs = settings.callOffMs,
-            pulses = 6
+            pulses = 1,
+            repeatUntilCancelled = true
         )
         FfaServices.flashEngine.play(
             pattern = pattern,
