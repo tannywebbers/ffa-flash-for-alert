@@ -8,7 +8,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.NotificationsActive
@@ -19,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,20 +30,16 @@ import kotlinx.coroutines.launch
 fun OnboardingScreen(
     uiState: FfaUiState,
     onOpenNotificationAccess: (Context) -> Unit,
-    onOpenBatteryOptimization: (Context) -> Unit,
     onContinue: () -> Unit,
     onRefresh: () -> Unit
 ) {
     val context = LocalContext.current
-    val pagerState = rememberPagerState(pageCount = { 5 })
+    val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = rememberCoroutineScope()
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(24.dp))
@@ -56,96 +50,39 @@ fun OnboardingScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f),
-                userScrollEnabled = true
-            ) { page ->
+            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f), userScrollEnabled = true) { page ->
                 when (page) {
                     0 -> OnboardPage(
                         icon = { Icon(Icons.Rounded.Bolt, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp)) },
                         title = "Welcome to FFA",
-                        body = "Never miss an important notification. Your camera flash will alert you instantly with sharp, precise pulses."
+                        body = "Never miss an incoming call. Your camera flash blinks continuously while your phone rings and stops when you answer, decline, or the call ends."
                     )
                     1 -> OnboardPage(
                         icon = { Icon(Icons.Rounded.NotificationsActive, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp)) },
                         title = "Notification access",
-                        body = "FFA needs notification access to detect alerts from the applications you choose. FFA only uses the source app to decide whether to flash — it does not read or collect message content.",
+                        body = "FFA needs notification access to detect incoming call alerts. FFA uses call notification signals only; it does not read or collect message content.",
                         extra = {
                             Spacer(Modifier.height(20.dp))
                             if (uiState.notificationAccessGranted) {
-                                AssistChip(
-                                    onClick = { onRefresh() },
-                                    label = { Text("Access granted") },
-                                    leadingIcon = { Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) }
-                                )
+                                AssistChip(onClick = onRefresh, label = { Text("Access granted") },
+                                    leadingIcon = { Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) })
                             } else {
-                                Button(
-                                    onClick = { onOpenNotificationAccess(context) },
-                                    modifier = Modifier.testTag("onboarding_notification_access_button")
-                                ) {
-                                    Text("Open notification access settings")
-                                }
+                                Button(onClick = { onOpenNotificationAccess(context) }) { Text("Open notification access settings") }
                                 Spacer(Modifier.height(8.dp))
                                 TextButton(onClick = onRefresh) { Text("I've granted access") }
                             }
                         }
                     )
                     2 -> OnboardPage(
-                        icon = { Icon(Icons.Rounded.BatteryChargingFull, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp)) },
-                        title = "Disable battery optimization",
-                        body = "Android battery optimization can delay or pause background flash services.\n\n1. Open battery optimization settings.\n2. Find FFA (or All apps).\n3. Set it to Unrestricted / Don't optimize.",
-                        extra = {
-                            Spacer(Modifier.height(20.dp))
-                            if (uiState.isBatteryOptimizationDisabled) {
-                                AssistChip(
-                                    onClick = { onRefresh() },
-                                    label = { Text("Battery unrestricted") },
-                                    leadingIcon = { Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) },
-                                    modifier = Modifier.testTag("onboarding_battery_granted_chip")
-                                )
-                            } else {
-                                Button(
-                                    onClick = { onOpenBatteryOptimization(context) },
-                                    modifier = Modifier.testTag("onboarding_battery_settings_button")
-                                ) {
-                                    Text("Open battery settings")
-                                }
-                                Spacer(Modifier.height(8.dp))
-                                TextButton(onClick = onRefresh) { Text("I've updated battery settings") }
-                            }
-                        }
-                    )
-                    3 -> OnboardPage(
                         icon = { Icon(Icons.Rounded.Tune, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp)) },
                         title = "Add FFA to Quick Settings",
-                        body = "Add FFA to your Control Center for instant activation.\n\n1. Swipe down to open Quick Settings.\n2. Tap Edit / pencil.\n3. Find \"FFA\" and drag it into your active tiles.\n4. Tap FFA once to activate or deactivate flash alerts.",
+                        body = "Add FFA to Quick Settings for instant activation.\n\n1. Swipe down to open Quick Settings.\n2. Tap Edit / pencil.\n3. Drag FFA into active tiles.\n4. Tap FFA to activate call flash alerts.",
                         extra = {
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                "If notification access or flash is unavailable, tapping the tile will open setup.",
+                                if (!uiState.notificationAccessGranted) "Notification access is still required for call detection." else "Ready. Enable FFA from Quick Settings to blink on incoming calls.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    )
-                    4 -> OnboardPage(
-                        icon = { Icon(Icons.Rounded.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp)) },
-                        title = "Choose your apps",
-                        body = "Select which applications can trigger flash alerts. You can change this anytime from the main screen.",
-                        extra = {
-                            Spacer(Modifier.height(12.dp))
-                            val status = when {
-                                !uiState.hasFlash -> "No camera flash detected on this device."
-                                !uiState.notificationAccessGranted -> "Notification access is still required for alerts to work."
-                                !uiState.isBatteryOptimizationDisabled -> "Tip: Disable battery optimization in Settings for reliable background flash alerts."
-                                else -> "You're ready. Continue to pick apps and enable FFA from Quick Settings."
-                            }
-                            Text(
-                                status,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (!uiState.hasFlash) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -154,68 +91,31 @@ fun OnboardingScreen(
             }
 
             Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.padding(vertical = 12.dp)) {
-                repeat(5) { i ->
+                repeat(3) { i ->
                     val selected = pagerState.currentPage == i
-                    Box(
-                        Modifier
-                            .padding(4.dp)
-                            .size(if (selected) 10.dp else 8.dp)
-                            .clip(CircleShape)
-                            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                    )
+                    Box(Modifier.padding(4.dp).size(if (selected) 10.dp else 8.dp).clip(CircleShape)
+                        .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)))
                 }
             }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                TextButton(
-                    onClick = { onContinue() },
-                    enabled = pagerState.currentPage < 4
-                ) { if (pagerState.currentPage < 4) Text("Skip") else Spacer(Modifier.width(1.dp)) }
-
+                TextButton(onClick = onContinue, enabled = pagerState.currentPage < 2) { if (pagerState.currentPage < 2) Text("Skip") else Spacer(Modifier.width(1.dp)) }
                 Button(onClick = {
-                    if (pagerState.currentPage < 4) {
-                        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                    } else {
-                        onContinue()
-                    }
-                }) {
-                    Text(if (pagerState.currentPage < 4) "Next" else "Open FFA")
-                }
+                    if (pagerState.currentPage < 2) scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } else onContinue()
+                }) { Text(if (pagerState.currentPage < 2) "Next" else "Open FFA") }
             }
         }
     }
 }
 
 @Composable
-private fun OnboardPage(
-    icon: @Composable () -> Unit,
-    title: String,
-    body: String,
-    extra: @Composable ColumnScope.() -> Unit = {}
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(110.dp)
-                .clip(RoundedCornerShape(28.dp))
-                .background(MaterialTheme.colorScheme.surface),
-            contentAlignment = Alignment.Center
-        ) { icon() }
+private fun OnboardPage(icon: @Composable () -> Unit, title: String, body: String, extra: @Composable ColumnScope.() -> Unit = {}) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Box(modifier = Modifier.size(110.dp).clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) { icon() }
         Spacer(Modifier.height(28.dp))
         Text(title, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
         Spacer(Modifier.height(12.dp))
-        Text(
-            body,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+        Text(body, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         extra()
     }
 }
