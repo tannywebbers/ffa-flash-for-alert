@@ -26,7 +26,8 @@ data class FfaSettings(
     val callOnMs: Long = FlashDefaults.CALL_ON_MS,
     val callOffMs: Long = FlashDefaults.CALL_OFF_MS,
     val brightnessMode: FlashBrightnessMode = FlashBrightnessMode.MAX,
-    val vibrationEnabled: Boolean = false
+    val vibrationEnabled: Boolean = false,
+    val batteryPromptDismissed: Boolean = false
 )
 
 class FfaPreferencesRepository(private val context: Context) {
@@ -41,6 +42,7 @@ class FfaPreferencesRepository(private val context: Context) {
         val CALL_OFF_MS = longPreferencesKey("call_off_ms")
         val BRIGHTNESS_MODE = stringPreferencesKey("brightness_mode")
         val VIBRATION_ENABLED = booleanPreferencesKey("vibration_enabled")
+        val BATTERY_PROMPT_DISMISSED = booleanPreferencesKey("battery_prompt_dismissed")
     }
 
     val settingsFlow: Flow<FfaSettings> = context.dataStore.data.map { p ->
@@ -58,7 +60,8 @@ class FfaPreferencesRepository(private val context: Context) {
             callOffMs = (p[Keys.CALL_OFF_MS] ?: FlashDefaults.CALL_OFF_MS)
                 .coerceIn(FlashDefaults.MIN_DURATION_MS, FlashDefaults.MAX_DURATION_MS),
             brightnessMode = FlashBrightnessMode.fromName(p[Keys.BRIGHTNESS_MODE]),
-            vibrationEnabled = p[Keys.VIBRATION_ENABLED] ?: false
+            vibrationEnabled = p[Keys.VIBRATION_ENABLED] ?: false,
+            batteryPromptDismissed = p[Keys.BATTERY_PROMPT_DISMISSED] ?: false
         )
     }
 
@@ -80,4 +83,5 @@ class FfaPreferencesRepository(private val context: Context) {
     }
     suspend fun setBrightnessMode(mode: FlashBrightnessMode) { context.dataStore.edit { it[Keys.BRIGHTNESS_MODE] = mode.name } }
     suspend fun setVibrationEnabled(enabled: Boolean) { context.dataStore.edit { it[Keys.VIBRATION_ENABLED] = enabled } }
+    suspend fun setBatteryPromptDismissed(dismissed: Boolean) { context.dataStore.edit { it[Keys.BATTERY_PROMPT_DISMISSED] = dismissed } }
 }

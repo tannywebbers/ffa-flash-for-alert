@@ -22,6 +22,8 @@ import com.ffa.flashforalert.domain.models.NotificationPreset
 import com.ffa.flashforalert.quicksettings.FfaQuickSettingsTileService
 import com.ffa.flashforalert.service.FfaServices
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +38,7 @@ data class FfaUiState(
     val searchQuery: String = "",
     val isLoadingApps: Boolean = true,
     val notificationAccessGranted: Boolean = false,
+    val isBatteryOptimizationDisabled: Boolean = false,
     val hasFlash: Boolean = false,
     val supportsTorchStrength: Boolean = false,
     val maxTorchStrength: Int = 1
@@ -55,6 +58,8 @@ class FfaViewModel(application: Application) : AndroidViewModel(application) {
     private val _search = MutableStateFlow("")
     private val _loading = MutableStateFlow(true)
     private val _access = MutableStateFlow(false)
+    private val _batteryUnrestricted = MutableStateFlow(false)
+    private var batteryRecheckJob: Job? = null
 
     private val settingsFlow = runCatching {
         FfaServices.init(getApplication())
@@ -68,8 +73,10 @@ class FfaViewModel(application: Application) : AndroidViewModel(application) {
         _apps,
         _search,
         _loading,
-        _access
-    ) { settings, apps, search, loading, access ->
+        combine(_access, _batteryUnrestricted) { access, batteryUnrestricted ->
+            access to batteryUnrestricted
+        }
+    ) { settings, apps, search, loading, (access, batteryUnrestricted) ->
         val hasFlash = runCatching { FfaServices.torchController.hasFlashUnit() }.getOrDefault(false)
         val supportsStrength = runCatching { FfaServices.torchController.supportsStrength }.getOrDefault(false)
         val maxStrength = runCatching { FfaServices.torchController.maxStrengthLevel }.getOrDefault(1)
@@ -79,6 +86,7 @@ class FfaViewModel(application: Application) : AndroidViewModel(application) {
             searchQuery = search,
             isLoadingApps = loading,
             notificationAccessGranted = access,
+            isBatteryOptimizationDisabled = batteryUnrestricted,
             hasFlash = hasFlash,
             supportsTorchStrength = supportsStrength,
             maxTorchStrength = maxStrength
@@ -93,9 +101,23 @@ class FfaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshPermissionState() {
         val granted = runCatching { PermissionUtils.isNotificationListenerEnabled(getApplication()) }.getOrDefault(false)
+        val batteryUnrestricted = runCatching { PermissionUtils.isIgnoringBatteryOptimizations(getApplication()) }.getOrDefault(false)
         _access.value = granted
+        _batteryUnrestricted.value = batteryUnrestricted
         runCatching { FfaServices.updateNotificationAccess(granted) }
         requestTileUpdate()
+
+        batteryRecheckJob?.cancel()
+        if (!batteryUnrestricted) {
+            batteryRecheckJob = viewModelScope.launch {
+                for (delayMs in listOf(350L, 900L)) {
+                    delay(delayMs)
+                    val updated = runCatching { PermissionUtils.isIgnoringBatteryOptimizations(getApplication()) }.getOrDefault(false)
+                    _batteryUnrestricted.value = updated
+                    if (updated) break
+                }
+            }
+        }
     }
 
     fun reloadApps() {
@@ -188,13 +210,36 @@ class FfaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun requestTileUpdate() {
-        val ctx = getApplication<Application>()
-        TileService.requestListeningState(ctx, ComponentName(ctx, FfaQuickSettingsTileService::class.java))
+        runCatching {
+            val ctx = getApplication<Application>()
+            TileService.requestListeningState(ctx, ComponentName(ctx, FfaQuickSettingsTileService::class.java))
+        }
     }
 
     fun loadAppIcon(packageName: String): Drawable? = appsRepo.loadIcon(packageName)
 
     fun openNotificationAccessSettings(context: Context) {
-        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching {
+            context.startActivity(intent)
+        }.onFailure {
+            runCatching {
+                val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.fromParts("package", context.packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(fallback)
+            }
+        }
+    }
+
+    fun openBatteryOptimizationSettings(context: Context) {
+        PermissionUtils.openBatteryOptimizationSettings(context)
+    }
+
+    fun dismissBatteryPrompt() {
+        viewModelScope.launch {
+            runCatching { FfaServices.preferences.setBatteryPromptDismissed(true) }
+        }
     }
 }

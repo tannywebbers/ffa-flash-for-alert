@@ -1,4 +1,4 @@
-# FFA — Flash For Alert
+# FFA ï¿½ Flash For Alert
 
 Native Android utility that triggers sharp camera-flash alerts for notifications from user-selected apps, controlled through a Quick Settings tile.
 

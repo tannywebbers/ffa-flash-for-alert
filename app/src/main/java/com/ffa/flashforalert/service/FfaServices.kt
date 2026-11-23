@@ -38,16 +38,13 @@ object FfaServices {
             if (initialized) return
             appContext = context.applicationContext
             if (!::preferences.isInitialized) {
-                preferences = runCatching { FfaPreferencesRepository(appContext) }
-                    .getOrElse { FfaPreferencesRepository(appContext) }
+                preferences = FfaPreferencesRepository(appContext)
             }
             if (!::torchController.isInitialized) {
-                torchController = runCatching { TorchController(appContext) }
-                    .getOrElse { TorchController(appContext) }
+                torchController = TorchController(appContext)
             }
             if (!::flashEngine.isInitialized) {
-                flashEngine = runCatching { FlashEngine(appContext, torchController) }
-                    .getOrElse { FlashEngine(appContext, torchController) }
+                flashEngine = FlashEngine(appContext, torchController)
             }
             if (!::settingsState.isInitialized) {
                 settingsState = runCatching {
@@ -68,5 +65,6 @@ object FfaServices {
         _notificationAccess.value = granted
     }
 
-    fun currentSettings(): FfaSettings = settingsState.value
+    fun currentSettings(): FfaSettings =
+        if (::settingsState.isInitialized) settingsState.value else FfaSettings()
 }

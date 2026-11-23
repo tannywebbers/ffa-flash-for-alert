@@ -5,13 +5,15 @@ import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.ffa.flashforalert.domain.models.FlashBrightnessMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class TorchController(context: Context) {
-    private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+    private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
     private val _torchAvailable = MutableStateFlow(false)
     val torchAvailable: StateFlow<Boolean> = _torchAvailable
 
@@ -19,24 +21,28 @@ class TorchController(context: Context) {
     private var cameraId: String? = null
 
     val maxStrengthLevel: Int
-        get() = cameraId?.let { id ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        get() {
+            val manager = cameraManager ?: return 1
+            val id = cameraId ?: return 1
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 runCatching {
-                    val chars = cameraManager.getCameraCharacteristics(id)
+                    val chars = manager.getCameraCharacteristics(id)
                     chars.get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL) ?: 1
                 }.getOrDefault(1)
             } else 1
-        } ?: 1
+        }
 
     val defaultStrengthLevel: Int
-        get() = cameraId?.let { id ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        get() {
+            val manager = cameraManager ?: return 1
+            val id = cameraId ?: return 1
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 runCatching {
-                    val chars = cameraManager.getCameraCharacteristics(id)
+                    val chars = manager.getCameraCharacteristics(id)
                     chars.get(CameraCharacteristics.FLASH_INFO_STRENGTH_DEFAULT_LEVEL) ?: 1
                 }.getOrDefault(1)
             } else 1
-        } ?: 1
+        }
 
     val supportsStrength: Boolean
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && maxStrengthLevel > 1
@@ -59,21 +65,22 @@ class TorchController(context: Context) {
     init {
         cameraId = findFlashCameraId()
         _torchAvailable.value = cameraId != null
-        runCatching { cameraManager.registerTorchCallback(torchCallback, null) }
+        runCatching { cameraManager?.registerTorchCallback(torchCallback, Handler(Looper.getMainLooper())) }
     }
 
     private fun findFlashCameraId(): String? {
+        val manager = cameraManager ?: return null
         return try {
-            cameraManager.cameraIdList.firstOrNull { id ->
-                val chars = cameraManager.getCameraCharacteristics(id)
+            manager.cameraIdList.firstOrNull { id ->
+                val chars = manager.getCameraCharacteristics(id)
                 val hasFlash = chars.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
                 val facing = chars.get(CameraCharacteristics.LENS_FACING)
                 hasFlash && (facing == CameraCharacteristics.LENS_FACING_BACK || facing == null)
-            } ?: cameraManager.cameraIdList.firstOrNull { id ->
-                cameraManager.getCameraCharacteristics(id)
+            } ?: manager.cameraIdList.firstOrNull { id ->
+                manager.getCameraCharacteristics(id)
                     .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "Failed to find flash camera", e)
             null
         }
@@ -82,17 +89,18 @@ class TorchController(context: Context) {
     fun hasFlashUnit(): Boolean = cameraId != null
 
     fun setTorch(on: Boolean, brightnessMode: FlashBrightnessMode = FlashBrightnessMode.MAX): Boolean {
+        val manager = cameraManager ?: return false
         val id = cameraId ?: findFlashCameraId()?.also { cameraId = it } ?: return false
         return try {
             if (on) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && supportsStrength) {
                     val level = strengthForMode(brightnessMode)
-                    cameraManager.turnOnTorchWithStrengthLevel(id, level)
+                    manager.turnOnTorchWithStrengthLevel(id, level)
                 } else {
-                    cameraManager.setTorchMode(id, true)
+                    manager.setTorchMode(id, true)
                 }
             } else {
-                cameraManager.setTorchMode(id, false)
+                manager.setTorchMode(id, false)
             }
             true
         } catch (e: CameraAccessException) {
@@ -127,7 +135,7 @@ class TorchController(context: Context) {
     }
 
     fun release() {
-        runCatching { cameraManager.unregisterTorchCallback(torchCallback) }
+        runCatching { cameraManager?.unregisterTorchCallback(torchCallback) }
         forceOff()
     }
 

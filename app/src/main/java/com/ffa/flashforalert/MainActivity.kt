@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         try {
             if (!FfaServices.isInitialized()) FfaServices.init(applicationContext)
-        } catch (_: Exception) { }
+        } catch (_: Throwable) { }
         enableEdgeToEdge()
         setContent {
             FfaTheme(darkTheme = true) {
@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
                 val openSetup = intent?.getBooleanExtra("open_setup", false) == true
                 val needsSetup = try {
                     !PermissionUtils.isNotificationListenerEnabled(this)
-                } catch (_: Exception) { true }
+                } catch (_: Throwable) { true }
                 FfaNav(
                     uiState = uiState,
                     viewModel = viewModel,
@@ -42,5 +42,12 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.refreshPermissionState()
         viewModel.reloadApps()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            viewModel.refreshPermissionState()
+        }
     }
 }

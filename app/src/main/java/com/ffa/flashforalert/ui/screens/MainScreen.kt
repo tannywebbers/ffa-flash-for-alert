@@ -2,6 +2,7 @@ package com.ffa.flashforalert.ui.screens
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
@@ -23,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +42,8 @@ fun MainScreen(
     onToggleAll: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNotificationAccess: (Context) -> Unit,
+    onOpenBatteryOptimization: (Context) -> Unit,
+    onDismissBatteryPrompt: () -> Unit,
     loadIcon: (String) -> Drawable?,
     onRefresh: () -> Unit
 ) {
@@ -46,9 +51,9 @@ fun MainScreen(
     val statusText = when {
         !uiState.hasFlash -> "Flash unavailable on this device"
         !uiState.notificationAccessGranted -> "Notification access required"
-        uiState.settings.ffaEnabled && uiState.selectedCount == 0 -> "FFA active · No apps selected"
-        uiState.settings.ffaEnabled -> "FFA active · ${uiState.selectedCount} app${if (uiState.selectedCount == 1) "" else "s"} selected"
-        else -> "FFA inactive · Enable from Quick Settings tile"
+        uiState.settings.ffaEnabled && uiState.selectedCount == 0 -> "FFA active ï¿½ No apps selected"
+        uiState.settings.ffaEnabled -> "FFA active ï¿½ ${uiState.selectedCount} app${if (uiState.selectedCount == 1) "" else "s"} selected"
+        else -> "FFA inactive ï¿½ Enable from Quick Settings tile"
     }
     val statusColor = when {
         !uiState.hasFlash || !uiState.notificationAccessGranted -> MaterialTheme.colorScheme.error
@@ -97,7 +102,17 @@ fun MainScreen(
                     showSetup = !uiState.notificationAccessGranted,
                     onSetup = { onOpenNotificationAccess(context) }
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
+            }
+
+            if (!uiState.isBatteryOptimizationDisabled && !uiState.settings.batteryPromptDismissed) {
+                item(key = "battery_optimization_card") {
+                    BatteryOptimizationCard(
+                        onOpenSettings = { onOpenBatteryOptimization(context) },
+                        onDismiss = onDismissBatteryPrompt
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
             }
 
             item {
@@ -207,6 +222,61 @@ private fun StatusCard(status: String, color: Color, showSetup: Boolean, onSetup
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = onSetup, contentPadding = PaddingValues(0.dp)) {
                 Text("Grant notification access")
+            }
+        }
+    }
+}
+
+@Composable
+private fun BatteryOptimizationCard(
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("main_battery_optimization_card"),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.BatteryAlert,
+                    contentDescription = "Battery optimization active",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "Disable battery optimization",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Android may pause or delay flash alerts when battery optimization is enabled. Set FFA to Unrestricted / Don't optimize.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilledTonalButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.testTag("main_battery_settings_button")
+                ) {
+                    Text("Open battery settings")
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.testTag("main_battery_dismiss_button")
+                ) {
+                    Text("Already unrestricted")
+                }
             }
         }
     }

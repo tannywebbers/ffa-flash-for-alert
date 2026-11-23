@@ -18,9 +18,9 @@ class FfaApplication : Application() {
         writeStartupMarker()
         try {
             FfaServices.init(this)
-        } catch (e: Exception) {
-            Log.e("FFA", "Service init failed", e)
-            writeCrashReport("service-init", e)
+        } catch (t: Throwable) {
+            Log.e("FFA", "Service init failed", t)
+            writeCrashReport("service-init", t)
         }
     }
 

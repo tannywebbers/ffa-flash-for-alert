@@ -30,6 +30,7 @@ fun FfaNav(
             OnboardingScreen(
                 uiState = uiState,
                 onOpenNotificationAccess = { viewModel.openNotificationAccessSettings(it) },
+                onOpenBatteryOptimization = { viewModel.openBatteryOptimizationSettings(it) },
                 onContinue = {
                     viewModel.setOnboardingCompleted()
                     navController.navigate(FfaRoute.MAIN.route) {
@@ -47,6 +48,8 @@ fun FfaNav(
                 onToggleAll = viewModel::setAllApps,
                 onOpenSettings = { navController.navigate(FfaRoute.SETTINGS.route) },
                 onOpenNotificationAccess = { viewModel.openNotificationAccessSettings(it) },
+                onOpenBatteryOptimization = { viewModel.openBatteryOptimizationSettings(it) },
+                onDismissBatteryPrompt = viewModel::dismissBatteryPrompt,
                 loadIcon = viewModel::loadAppIcon,
                 onRefresh = {
                     viewModel.refreshPermissionState()
@@ -64,7 +67,9 @@ fun FfaNav(
                 onBrightness = viewModel::setBrightnessMode,
                 onVibration = viewModel::setVibrationEnabled,
                 onPreviewNotification = viewModel::previewNotificationPattern,
-                onPreviewCall = viewModel::previewCallPattern
+                onPreviewCall = viewModel::previewCallPattern,
+                onOpenBatteryOptimization = { viewModel.openBatteryOptimizationSettings(it) },
+                onRefreshStatus = { viewModel.refreshPermissionState() }
             )
         }
     }

@@ -1,5 +1,9 @@
 package com.ffa.flashforalert.quicksettings
 
+import android.annotation.SuppressLint
+import android.app.PendingIntent
+import android.content.Intent
+import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import android.util.Log
@@ -36,12 +40,24 @@ class FfaQuickSettingsTileService : TileService() {
             // Trying to enable
             if (!hasAccess || !hasFlash) {
                 // Direct user to app/setup; TileService can start activity on unlock
-                val intent = android.content.Intent(this, com.ffa.flashforalert.MainActivity::class.java).apply {
-                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                val intent = Intent(this, com.ffa.flashforalert.MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra("open_setup", true)
                 }
                 try {
-                    unlockAndRun { startActivityAndCollapse(intent) }
+                    unlockAndRun {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                            val pi = PendingIntent.getActivity(
+                                this,
+                                0,
+                                intent,
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                            )
+                            startActivityAndCollapse(pi)
+                        } else {
+                            startActivityAndCollapseLegacy(intent)
+                        }
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to open setup", e)
                 }
@@ -67,6 +83,12 @@ class FfaQuickSettingsTileService : TileService() {
         super.onDestroy()
     }
 
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    @Suppress("DEPRECATION")
+    private fun startActivityAndCollapseLegacy(intent: Intent) {
+        startActivityAndCollapse(intent)
+    }
+
     private fun ensureInit() {
         if (!FfaServices.isInitialized()) FfaServices.init(applicationContext)
     }
@@ -84,14 +106,17 @@ class FfaQuickSettingsTileService : TileService() {
         val active = settings.ffaEnabled && hasAccess && hasFlash
         tile.state = if (active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = "FFA"
-        tile.subtitle = when {
+        val statusText = when {
             !hasFlash -> "No flash"
             !hasAccess -> "Access needed"
             settings.ffaEnabled && settings.selectedPackages.isEmpty() -> "No apps"
             settings.ffaEnabled -> "Active"
             else -> "Off"
         }
-        tile.contentDescription = tile.subtitle
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            tile.subtitle = statusText
+        }
+        tile.contentDescription = statusText
         tile.updateTile()
     }
 

@@ -1,5 +1,6 @@
 package com.ffa.flashforalert.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -8,7 +9,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -17,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -36,8 +41,11 @@ fun SettingsScreen(
     onBrightness: (FlashBrightnessMode) -> Unit,
     onVibration: (Boolean) -> Unit,
     onPreviewNotification: () -> Unit,
-    onPreviewCall: () -> Unit
+    onPreviewCall: () -> Unit,
+    onOpenBatteryOptimization: (Context) -> Unit,
+    onRefreshStatus: () -> Unit
 ) {
+    val context = LocalContext.current
     val settings = uiState.settings
     Scaffold(
         topBar = {
@@ -153,6 +161,53 @@ fun SettingsScreen(
                         Text("40 ms (fixed)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = settings.vibrationEnabled, onCheckedChange = onVibration)
+                }
+            }
+
+            // Battery & background reliability
+            SectionCard(
+                title = "Battery & reliability",
+                subtitle = "Keep background flash alerts responsive during Doze and screen-off periods."
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Battery optimization", fontWeight = FontWeight.Medium)
+                    Text(
+                        if (uiState.isBatteryOptimizationDisabled) "Unrestricted" else "Optimized",
+                        color = if (uiState.isBatteryOptimizationDisabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (uiState.isBatteryOptimizationDisabled) {
+                        "Battery optimization is disabled for FFA. Background flash alerts can fire without system Doze delays."
+                    } else {
+                        "How to disable: tap Open battery settings -> find FFA -> select Unrestricted / Don't optimize."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = { onOpenBatteryOptimization(context) },
+                        modifier = Modifier.testTag("settings_battery_button")
+                    ) {
+                        Icon(Icons.Outlined.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (uiState.isBatteryOptimizationDisabled) "Review battery settings" else "Open battery settings")
+                    }
+                    OutlinedButton(
+                        onClick = onRefreshStatus,
+                        modifier = Modifier.testTag("settings_battery_refresh_button")
+                    ) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Refresh battery status", modifier = Modifier.size(18.dp))
+                    }
                 }
             }
 
@@ -303,7 +358,7 @@ private fun DurationInputs(
             }
         }
         Text(
-            "Limits: ${FlashDefaults.MIN_DURATION_MS}–${FlashDefaults.MAX_DURATION_MS} ms.",
+            "Limits: ${FlashDefaults.MIN_DURATION_MS}ï¿½${FlashDefaults.MAX_DURATION_MS} ms.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
