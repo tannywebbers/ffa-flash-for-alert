@@ -2,6 +2,7 @@ package com.ffa.flashforalert.flash
 
 import android.content.Context
 import android.os.Build
+import android.os.PowerManager
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -40,6 +41,26 @@ class FlashEngine(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val commandMutex = Mutex()
     private var currentJob: Job? = null
+    private val wakeLock: PowerManager.WakeLock? = runCatching {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "FFA:FlashEngine")?.apply {
+            setReferenceCounted(false)
+        }
+    }.getOrNull()
+
+    private fun acquireWakeLock() {
+        runCatching {
+            val wl = wakeLock ?: return
+            if (!wl.isHeld) wl.acquire(15_000L)
+        }
+    }
+
+    private fun releaseWakeLock() {
+        runCatching {
+            val wl = wakeLock ?: return
+            if (wl.isHeld) wl.release()
+        }
+    }
 
     fun play(pattern: FlashPattern, brightnessMode: FlashBrightnessMode, vibrate: Boolean) {
         scope.launch {
@@ -47,6 +68,7 @@ class FlashEngine(
                 currentJob?.cancel()
                 currentJob = null
                 torchController.forceOff()
+                acquireWakeLock()
                 currentJob = scope.launch {
                     runPattern(pattern, brightnessMode, vibrate)
                 }
@@ -60,6 +82,7 @@ class FlashEngine(
                 currentJob?.cancel()
                 currentJob = null
                 torchController.forceOff()
+                releaseWakeLock()
             }
         }
     }
@@ -93,6 +116,7 @@ class FlashEngine(
             Log.w(TAG, "Flash pattern failed", e)
         } finally {
             torchController.forceOff()
+            releaseWakeLock()
         }
     }
 
