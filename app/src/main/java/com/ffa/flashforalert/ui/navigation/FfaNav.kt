@@ -1,6 +1,7 @@
 package com.ffa.flashforalert.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -17,7 +18,7 @@ fun FfaNav(
     startInSetup: Boolean
 ) {
     val navController = rememberNavController()
-    val start = androidx.compose.runtime.remember {
+    val start = remember {
         when {
             !uiState.settings.onboardingCompleted -> FfaRoute.ONBOARDING.route
             startInSetup && !uiState.notificationAccessGranted -> FfaRoute.ONBOARDING.route
@@ -30,6 +31,7 @@ fun FfaNav(
             OnboardingScreen(
                 uiState = uiState,
                 onOpenNotificationAccess = { viewModel.openNotificationAccessSettings(it) },
+                onOpenBatteryOptimization = { viewModel.openBatteryOptimizationSettings(it) },
                 onContinue = {
                     viewModel.setOnboardingCompleted()
                     navController.navigate(FfaRoute.MAIN.route) {
@@ -42,10 +44,17 @@ fun FfaNav(
         composable(FfaRoute.MAIN.route) {
             MainScreen(
                 uiState = uiState,
+                onSearchChange = viewModel::onSearchChange,
+                onToggleApp = viewModel::toggleApp,
+                onToggleAll = viewModel::setAllApps,
                 onOpenSettings = { navController.navigate(FfaRoute.SETTINGS.route) },
                 onOpenNotificationAccess = { viewModel.openNotificationAccessSettings(it) },
+                onOpenBatteryOptimization = { viewModel.openBatteryOptimizationSettings(it) },
+                onDismissBatteryPrompt = viewModel::dismissBatteryPrompt,
+                loadIcon = viewModel::loadAppIcon,
                 onRefresh = {
                     viewModel.refreshPermissionState()
+                    viewModel.reloadApps()
                 }
             )
         }
@@ -53,10 +62,15 @@ fun FfaNav(
             SettingsScreen(
                 uiState = uiState,
                 onBack = { navController.popBackStack() },
+                onPreset = viewModel::setNotificationPreset,
+                onNotificationTiming = viewModel::setNotificationTimingCustom,
                 onCallTiming = viewModel::setCallTiming,
                 onBrightness = viewModel::setBrightnessMode,
                 onVibration = viewModel::setVibrationEnabled,
-                onPreviewCall = viewModel::previewCallPattern
+                onPreviewNotification = viewModel::previewNotificationPattern,
+                onPreviewCall = viewModel::previewCallPattern,
+                onOpenBatteryOptimization = { viewModel.openBatteryOptimizationSettings(it) },
+                onRefreshStatus = viewModel::refreshPermissionState
             )
         }
     }

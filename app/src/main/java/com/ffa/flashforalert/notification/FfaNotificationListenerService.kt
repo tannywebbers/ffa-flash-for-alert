@@ -62,9 +62,14 @@ class FfaNotificationListenerService : NotificationListenerService() {
             val n = sbn.notification ?: return
             if (isCallNotification(n)) {
                 handleCallNotification(sbn, n)
+                return
             }
-            // App is call-only by product requirement: ignore non-call notifications.
-            return
+
+            if (!deduplicator.isNewEvent(sbn)) return
+            if (!isAlertableNotification(sbn)) return
+            if (!settings.selectedPackages.contains(pkg)) return
+
+            triggerNotificationFlash()
         } catch (e: Exception) {
             Log.w(TAG, "onNotificationPosted error", e)
         }
@@ -86,8 +91,7 @@ class FfaNotificationListenerService : NotificationListenerService() {
     }
 
     private fun handleCallNotification(sbn: StatusBarNotification, n: Notification) {
-        val isRinging = isIncomingRingingCall(n)
-        if (isRinging) {
+        if (isIncomingRingingCall(n)) {
             if (!deduplicator.isNewEvent(sbn)) return
             triggerCallFlash()
         } else {
@@ -100,8 +104,45 @@ class FfaNotificationListenerService : NotificationListenerService() {
         val isOngoing = (n.flags and Notification.FLAG_ONGOING_EVENT) != 0
         val isGroupSummary = (n.flags and Notification.FLAG_GROUP_SUMMARY) != 0
         if (isGroupSummary || !isOngoing) return false
-        // Incoming ringing call notifications commonly expose a full-screen intent.
+
+        // Android 12+ Notification.CallStyle sets "android.callType":
+        // 1 = CALL_TYPE_INCOMING, 2 = CALL_TYPE_ONGOING (answered or outgoing), 3 = CALL_TYPE_SCREENING
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val extras = n.extras
+            if (extras != null && extras.containsKey("android.callType")) {
+                val callType = extras.getInt("android.callType", -1)
+                return callType == 1
+            }
+        }
+
+        // Fallback for older Android versions or custom dialers:
+        // Incoming ringing calls set a fullScreenIntent; outgoing/active calls do not.
         return n.fullScreenIntent != null
+    }
+
+    private fun isAlertableNotification(sbn: StatusBarNotification): Boolean {
+        val n = sbn.notification ?: return false
+        if (sbn.isOngoing && n.category != Notification.CATEGORY_MESSAGE && n.category != Notification.CATEGORY_EMAIL) {
+            return false
+        }
+        return true
+    }
+
+    private fun triggerNotificationFlash() {
+        val settings = FfaServices.currentSettings()
+        if (!FfaServices.torchController.hasFlashUnit()) return
+        val pattern = FlashPattern(
+            initialOffMs = FlashDefaults.NOTIFICATION_INITIAL_OFF_MS,
+            onMs = settings.notificationOnMs,
+            offMs = settings.notificationOffMs,
+            pulses = FlashDefaults.NOTIFICATION_PULSES,
+            repeatUntilCancelled = false
+        )
+        FfaServices.flashEngine.play(
+            pattern = pattern,
+            brightnessMode = settings.brightnessMode,
+            vibrate = settings.vibrationEnabled
+        )
     }
 
     private fun triggerCallFlash() {
